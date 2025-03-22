@@ -4,6 +4,7 @@
 // Dependencies:
 //     - M5StickCPlus2 library (M5Stack)
 //     - OSC library (Adrian Freed)
+//     - Adafruit AHRS (Adafruit)
 //
 // Description:
 //     - Send M5StickCPlus2 IMU data via OSC messages
@@ -14,15 +15,18 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <OSCMessage.h>
+#include <Adafruit_AHRS_Mahony.h>
 
-#include "wifi_config.h"
-#include "MahonyAHRS.h"
+#include "wifi_config.h" // config with WiFi network's information
+
+// Mahony filter
+Adafruit_Mahony filter;
 
 // WiFi setup
-const char *ssid = SSID;            // <----- your WiFi network's name
-const char *password = PASS;        // <----- your WiFi password
-const IPAddress outIp = OUT_IP;     // <----- IP address of receiving device
-const unsigned int outPort = 8000;  // <----- receiving device in port
+const char *ssid = SSID;            // WiFi network's name
+const char *password = PASS;        // WiFi password
+const IPAddress outIp = OUT_IP;     // IP address of the receiving device
+const unsigned int outPort = 8000;  // receiving device input port
 
 // Object for OSC/UDP
 WiFiUDP udp;
@@ -42,6 +46,11 @@ float gyroZ = 0.f;
 float pitch = 0.f;
 float roll = 0.f;
 float yaw = 0.f;
+
+float w = 0.0f;
+float x = 0.0f;
+float y = 0.0f;
+float z = 0.0f;
 
 //=============================================================
 // FUNCTIONS
@@ -111,6 +120,8 @@ void setup()
   auto cfg = M5.config();
   StickCP2.begin(cfg);
 
+  filter.begin(10); // Set filter update frequency (Hz)
+
   // Connect to WiFi network
   connectToWiFi();
   udp.begin(inPort);
@@ -163,7 +174,14 @@ void loop()
     // data.value;       // all sensor 9values array [0~2]=accel / [3~5]=gyro / [6~8]=mag
 
     // Calculate pitch, roll and yaw based on accelerometer and gyroscope readings using Mahony's AHRS algorithm
-    MahonyAHRSupdateIMU(gyroX, gyroY, gyroZ, accX, accY, accZ, &pitch, &roll, &yaw);
+    filter.updateIMU(gyroX, gyroY, gyroZ, accX, accY, accZ);
+
+    pitch = filter.getPitch();
+    roll = filter.getRoll();
+    yaw = filter.getYaw();
+
+    // Get quaternions representing the rotation
+    filter.getQuaternion(&w, &x, &y, &z);
   }
 
   // 2. PRINT DATA TO M5 LCD (optional)
@@ -198,6 +216,12 @@ void loop()
   sendFloatOscMessage("/pitch", pitch);
   sendFloatOscMessage("/roll", roll);
   sendFloatOscMessage("/yaw", yaw);
+
+  // Quaternions
+  sendFloatOscMessage("/w", w);
+  sendFloatOscMessage("/x", x);
+  sendFloatOscMessage("/y", y);
+  sendFloatOscMessage("/z", z);
 
   // Add a short pause (e.g. 100 milliseconds) between cycles
   // This helps the WiFi router keep up
