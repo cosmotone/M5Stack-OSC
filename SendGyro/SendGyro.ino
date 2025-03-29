@@ -22,6 +22,9 @@
 // Mahony filter
 Adafruit_Mahony filter;
 
+// Set interval at which the data will be gathered and sent (in ms)
+const int interval = 100;
+
 // WiFi setup
 const char *ssid = SSID;            // WiFi network's name
 const char *password = PASS;        // WiFi password
@@ -47,10 +50,18 @@ float pitch = 0.f;
 float roll = 0.f;
 float yaw = 0.f;
 
-float w = 0.0f;
-float x = 0.0f;
-float y = 0.0f;
-float z = 0.0f;
+float w = 0.f;
+float x = 0.f;
+float y = 0.f;
+float z = 0.f;
+
+float offsetAccX = 0.f;
+float offsetAccY = 0.f;
+float offsetAccZ = 0.f;
+
+float compAccX = 0.f;
+float compAccY = 0.f;
+float compAccZ = 0.f;
 
 //=============================================================
 // FUNCTIONS
@@ -113,6 +124,33 @@ void sendFloatOscMessage(const char *address, float message)
   oscMsg.empty();
 }
 
+void calibratePosition()
+{
+    StickCP2.Speaker.tone(8000, 20);
+    StickCP2.Display.clear();
+    StickCP2.Display.setCursor(40, 30);
+    StickCP2.Display.println("Calibrating position");
+    filter.setQuaternion(1.0f, 0.0f, 0.0f, 0.0f); // Assuming that the M5StickCPlus2 is positioned with its screen facing up
+    StickCP2.Display.setCursor(0, 40);
+    // Measures accelerometer values within (100 * 10) ms window
+    int calibrationCount = 100;
+    for (int i = 0; i < calibrationCount ; i++) {
+        offsetAccX += accX;
+        offsetAccY += accY;
+        offsetAccZ += (accZ-1); // Z=1 when M5StickCPlus2 is positioned with its screen facing up
+        StickCP2.Display.print("-");
+        delay(10);
+    }
+    // Returns average accelerometer values
+    offsetAccX /= calibrationCount;
+    offsetAccY /= calibrationCount;
+    offsetAccZ /= calibrationCount;
+    StickCP2.Display.setCursor(40, 70);
+    StickCP2.Display.printf("%6.2f  %6.2f  %6.2f      ", offsetAccX, offsetAccY, offsetAccZ);
+    delay(1000);
+    StickCP2.Display.clear();
+}
+
 //=============================================================
 // SETUP
 void setup()
@@ -120,7 +158,7 @@ void setup()
   auto cfg = M5.config();
   StickCP2.begin(cfg);
 
-  filter.begin(10); // Set filter update frequency (Hz)
+  filter.begin(1000/interval); // Set filter update frequency (Hz)
 
   // Connect to WiFi network
   connectToWiFi();
@@ -133,15 +171,6 @@ void setup()
   StickCP2.Display.setRotation(3);
   StickCP2.Display.fillScreen(BLACK);
   StickCP2.Display.setTextSize(1);
-
-  StickCP2.Display.setCursor(80, 15);
-  StickCP2.Display.println("SEND GYRO");
-
-  StickCP2.Display.setCursor(30, 30);
-  StickCP2.Display.println("  X       Y       Z");
-
-  StickCP2.Display.setCursor(30, 70);
-  StickCP2.Display.println("  Pitch   Roll    Yaw");
 }
 
 //=============================================================
@@ -173,8 +202,13 @@ void loop()
 
     // data.value;       // all sensor 9values array [0~2]=accel / [3~5]=gyro / [6~8]=mag
 
+    // Compensate accelerometer values with the average offset measured during calibration
+    compAccX = accX - offsetAccX;
+    compAccY = accY - offsetAccY;
+    compAccZ = accZ - offsetAccZ;
+
     // Calculate pitch, roll and yaw based on accelerometer and gyroscope readings using Mahony's AHRS algorithm
-    filter.updateIMU(gyroX, gyroY, gyroZ, accX, accY, accZ);
+    filter.updateIMU(gyroX, gyroY, gyroZ, compAccX, compAccY, compAccZ);
 
     pitch = filter.getPitch();
     roll = filter.getRoll();
@@ -184,7 +218,19 @@ void loop()
     filter.getQuaternion(&w, &x, &y, &z);
   }
 
+  StickCP2.update();
+  // Trigger calibration routine when button A is pressed
+  if (StickCP2.BtnA.wasPressed()) {
+    calibratePosition();
+  }
+
   // 2. PRINT DATA TO M5 LCD (optional)
+  StickCP2.Display.setCursor(80, 15);
+  StickCP2.Display.println("SEND GYRO");
+
+  StickCP2.Display.setCursor(30, 30);
+  StickCP2.Display.println("  X       Y       Z");
+
   // Gyroscope data
   StickCP2.Display.setCursor(30, 40);
   StickCP2.Display.printf("%6.2f  %6.2f  %6.2f      ", gyroX, gyroY, gyroZ);
@@ -197,7 +243,10 @@ void loop()
   StickCP2.Display.setCursor(170, 50);
   StickCP2.Display.print("G");
 
-  // AHRS data
+  StickCP2.Display.setCursor(30, 70);
+  StickCP2.Display.println("  Pitch   Roll    Yaw");
+
+  // Calculated AHRS
   StickCP2.Display.setCursor(30, 80);
   StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", pitch, roll, yaw);
 
@@ -212,12 +261,12 @@ void loop()
   sendFloatOscMessage("/accY", accY);
   sendFloatOscMessage("/accZ", accZ);
 
-  // AHRS data
+  // Calculated AHRS
   sendFloatOscMessage("/pitch", pitch);
   sendFloatOscMessage("/roll", roll);
   sendFloatOscMessage("/yaw", yaw);
 
-  // Quaternions
+  // Calculated quaternions
   sendFloatOscMessage("/w", w);
   sendFloatOscMessage("/x", x);
   sendFloatOscMessage("/y", y);
@@ -225,5 +274,5 @@ void loop()
 
   // Add a short pause (e.g. 100 milliseconds) between cycles
   // This helps the WiFi router keep up
-  delay(100);
+  delay(interval);
 }
