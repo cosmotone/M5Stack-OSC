@@ -27,8 +27,8 @@ Created based on: [Edinburgh-College-of-Art/m5stickc-plus-introduction/.../SendF
 The following data is transmitted:  
  - `/gyroX` `/gyroY` `/gyroZ` - gyroscope data  
  - `/accX` `/accY` `/accZ` - accelerometer data  
- - `/pitch` `/roll` `/yaw` - attitude and heading reference system (AHRS) data
- - `/w/` `/x` `/y` `/z` - quaternions representing rotation
+ - `/pitch` `/roll` `/yaw` - calculated attitude and heading reference system (AHRS)
+ - `/w` `/x` `/y` `/z` - calculated quaternions representing rotation
 
 
 ## Dependencies
