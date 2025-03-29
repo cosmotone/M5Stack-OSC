@@ -25,6 +25,11 @@ Adafruit_Mahony filter;
 // Set interval at which the data will be gathered and sent (in ms)
 const int interval = 100;
 
+// Variables for the timer interrupt
+volatile int interruptCounter;
+hw_timer_t * timer = NULL;
+portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+
 // WiFi setup
 const char *ssid = SSID;            // WiFi network's name
 const char *password = PASS;        // WiFi password
@@ -71,38 +76,34 @@ float compAccZ = 0.f;
 /// @return status (bool) true = successful, false = failed
 bool connectToWiFi()
 {
-  StickCP2.Display.print("Connecting");
+    StickCP2.Display.print("Connecting");
 
-  // initialise - WIFI_STA = Station Mode
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
+    // initialise - WIFI_STA = Station Mode
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid, password);
 
-  // start timer
-  unsigned long startAttemptTime = millis();
+    // start timer
+    unsigned long startAttemptTime = millis();
 
-  // while not connected to WiFi AND before timeout
-  while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 30000)
-  {
-    StickCP2.Display.print(".");
-    delay(400);
-  }
+    // while not connected to WiFi AND before timeout
+    while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 30000) {
+        StickCP2.Display.print(".");
+        delay(400);
+    }
 
-  // Print status to LCD
-  if (WiFi.status() != WL_CONNECTED)
-  {
-    StickCP2.Display.println("\nErr: Failed to connect");
-    delay(2000);
-    return false;
-  }
-  else
-  {
-    StickCP2.Display.println("\nConnected to:");
-    StickCP2.Display.println(ssid);
-    StickCP2.Display.println(WiFi.localIP());
+    // Print status to LCD
+    if (WiFi.status() != WL_CONNECTED) {
+        StickCP2.Display.println("\nErr: Failed to connect");
+        delay(2000);
+        return false;
+    } else {
+        StickCP2.Display.println("\nConnected to:");
+        StickCP2.Display.println(ssid);
+        StickCP2.Display.println(WiFi.localIP());
 
-    delay(2000);
-    return true;
-  }
+        delay(2000);
+        return true;
+    }
 }
 
 /// Send float OSC Message
@@ -111,17 +112,17 @@ bool connectToWiFi()
 /// @param message (float) message to send
 void sendFloatOscMessage(const char *address, float message)
 {
-  // init message
-  OSCMessage oscMsg(address);
-  oscMsg.add(message);
+    // init message
+    OSCMessage oscMsg(address);
+    oscMsg.add(message);
 
-  // send message
-  udp.beginPacket(outIp, outPort);
-  oscMsg.send(udp);
+    // send message
+    udp.beginPacket(outIp, outPort);
+    oscMsg.send(udp);
 
-  // clear message
-  udp.endPacket();
-  oscMsg.empty();
+    // clear message
+    udp.endPacket();
+    oscMsg.empty();
 }
 
 void calibratePosition()
@@ -151,128 +152,148 @@ void calibratePosition()
     StickCP2.Display.clear();
 }
 
+void IRAM_ATTR onTimer() {
+    portENTER_CRITICAL_ISR(&timerMux);
+    interruptCounter++;
+    portEXIT_CRITICAL_ISR(&timerMux);
+}
+
 //=============================================================
 // SETUP
 void setup()
 {
-  auto cfg = M5.config();
-  StickCP2.begin(cfg);
+    auto cfg = M5.config();
+    StickCP2.begin(cfg);
 
-  filter.begin(1000/interval); // Set filter update frequency (Hz)
+    filter.begin(1000/interval); // Set filter update frequency (Hz)
 
-  // Connect to WiFi network
-  connectToWiFi();
-  udp.begin(inPort);
+    // Connect to WiFi network
+    connectToWiFi();
+    udp.begin(inPort);
 
-  delay(1000);
-  StickCP2.Display.fillScreen(BLACK);
+    delay(1000);
+    StickCP2.Display.fillScreen(BLACK);
 
-  // Display setup
-  StickCP2.Display.setRotation(3);
-  StickCP2.Display.fillScreen(BLACK);
-  StickCP2.Display.setTextSize(1);
+    // Display setup
+    StickCP2.Display.setRotation(3);
+    StickCP2.Display.fillScreen(BLACK);
+    StickCP2.Display.setTextSize(1);
+
+    // Use first (0) hardware timer on ESP32
+    // Counts every microsecond 
+    // true: count up 
+    timer = timerBegin(0 ,getApbFrequency() / 1000000 ,true );
+
+    // Set timer interrupt 
+    timerAttachInterrupt(timer, &onTimer, true );
+
+    // Set timer in microseconds 
+    timerAlarmWrite(timer, 1000 * interval, true );
+
+    // Start the timer
+    timerAlarmEnable(timer);
 }
 
 //=============================================================
 // LOOP
 void loop()
 {
+    if (interruptCounter > 0) {
+        portENTER_CRITICAL(&timerMux);
+        interruptCounter--;
+        portEXIT_CRITICAL(&timerMux);
+        
+        // 1. GET IMU DATA
+        auto imu_update = StickCP2.Imu.update();
+        if (imu_update) {
+            auto data = StickCP2.Imu.getImuData();
 
-  // 1. GET IMU DATA
-  auto imu_update = StickCP2.Imu.update();
-  if (imu_update)
-  {
-    auto data = StickCP2.Imu.getImuData();
+            // The data obtained by getImuData can be used as follows.
+            accX = data.accel.x; // accel x-axis value.
+            accY = data.accel.y; // accel y-axis value.
+            accZ = data.accel.z; // accel z-axis value.
+            // data.accel.value; // accel 3values array [0]=x / [1]=y / [2]=z.
 
-    // The data obtained by getImuData can be used as follows.
-    accX = data.accel.x; // accel x-axis value.
-    accY = data.accel.y; // accel y-axis value.
-    accZ = data.accel.z; // accel z-axis value.
-    // data.accel.value; // accel 3values array [0]=x / [1]=y / [2]=z.
+            gyroX = data.gyro.x; // gyro x-axis value.
+            gyroY = data.gyro.y; // gyro y-axis value.
+            gyroZ = data.gyro.z; // gyro z-axis value.
+            // data.gyro.value;  // gyro 3values array [0]=x / [1]=y / [2]=z.
 
-    gyroX = data.gyro.x; // gyro x-axis value.
-    gyroY = data.gyro.y; // gyro y-axis value.
-    gyroZ = data.gyro.z; // gyro z-axis value.
-    // data.gyro.value;  // gyro 3values array [0]=x / [1]=y / [2]=z.
+            // pitch = data.mag.x;  // mag x-axis value.
+            // roll = data.mag.y;   // mag y-axis value.
+            // yaw = data.mag.z;    // mag z-axis value.
+            // data.mag.value;   // mag 3values array [0]=x / [1]=y / [2]=z.
 
-    // pitch = data.mag.x;  // mag x-axis value.
-    // roll = data.mag.y;   // mag y-axis value.
-    // yaw = data.mag.z;    // mag z-axis value.
-    // data.mag.value;   // mag 3values array [0]=x / [1]=y / [2]=z.
+            // data.value;       // all sensor 9values array [0~2]=accel / [3~5]=gyro / [6~8]=mag
 
-    // data.value;       // all sensor 9values array [0~2]=accel / [3~5]=gyro / [6~8]=mag
+            // Compensate accelerometer values with the average offset measured during calibration
+            compAccX = accX - offsetAccX;
+            compAccY = accY - offsetAccY;
+            compAccZ = accZ - offsetAccZ;
 
-    // Compensate accelerometer values with the average offset measured during calibration
-    compAccX = accX - offsetAccX;
-    compAccY = accY - offsetAccY;
-    compAccZ = accZ - offsetAccZ;
+            // Calculate pitch, roll and yaw based on accelerometer and gyroscope readings using Mahony's AHRS algorithm
+            filter.updateIMU(gyroX, gyroY, gyroZ, compAccX, compAccY, compAccZ);
 
-    // Calculate pitch, roll and yaw based on accelerometer and gyroscope readings using Mahony's AHRS algorithm
-    filter.updateIMU(gyroX, gyroY, gyroZ, compAccX, compAccY, compAccZ);
+            pitch = filter.getPitch();
+            roll = filter.getRoll();
+            yaw = filter.getYaw();
 
-    pitch = filter.getPitch();
-    roll = filter.getRoll();
-    yaw = filter.getYaw();
+            // Get quaternions representing the rotation
+            filter.getQuaternion(&w, &x, &y, &z);
+        }
 
-    // Get quaternions representing the rotation
-    filter.getQuaternion(&w, &x, &y, &z);
-  }
+        StickCP2.update();
+        // Trigger calibration routine when button A is pressed
+        if (StickCP2.BtnA.wasPressed()) {
+            calibratePosition();
+        }
 
-  StickCP2.update();
-  // Trigger calibration routine when button A is pressed
-  if (StickCP2.BtnA.wasPressed()) {
-    calibratePosition();
-  }
+        // 2. PRINT DATA TO M5 LCD (optional)
+        StickCP2.Display.setCursor(80, 15);
+        StickCP2.Display.println("SEND GYRO");
 
-  // 2. PRINT DATA TO M5 LCD (optional)
-  StickCP2.Display.setCursor(80, 15);
-  StickCP2.Display.println("SEND GYRO");
+        StickCP2.Display.setCursor(30, 30);
+        StickCP2.Display.println("  X       Y       Z");
 
-  StickCP2.Display.setCursor(30, 30);
-  StickCP2.Display.println("  X       Y       Z");
+        // Gyroscope data
+        StickCP2.Display.setCursor(30, 40);
+        StickCP2.Display.printf("%6.2f  %6.2f  %6.2f      ", gyroX, gyroY, gyroZ);
+        StickCP2.Display.setCursor(170, 40);
+        StickCP2.Display.print("o/s");
 
-  // Gyroscope data
-  StickCP2.Display.setCursor(30, 40);
-  StickCP2.Display.printf("%6.2f  %6.2f  %6.2f      ", gyroX, gyroY, gyroZ);
-  StickCP2.Display.setCursor(170, 40);
-  StickCP2.Display.print("o/s");
+        // Accelerometer data
+        StickCP2.Display.setCursor(30, 50);
+        StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", accX, accY, accZ);
+        StickCP2.Display.setCursor(170, 50);
+        StickCP2.Display.print("G");
 
-  // Accelerometer data
-  StickCP2.Display.setCursor(30, 50);
-  StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", accX, accY, accZ);
-  StickCP2.Display.setCursor(170, 50);
-  StickCP2.Display.print("G");
+        StickCP2.Display.setCursor(30, 70);
+        StickCP2.Display.println("  Pitch   Roll    Yaw");
 
-  StickCP2.Display.setCursor(30, 70);
-  StickCP2.Display.println("  Pitch   Roll    Yaw");
+        // Calculated AHRS
+        StickCP2.Display.setCursor(30, 80);
+        StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", pitch, roll, yaw);
 
-  // Calculated AHRS
-  StickCP2.Display.setCursor(30, 80);
-  StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", pitch, roll, yaw);
+        // 3. SEND DATA VIA OSC
+        // Gyroscope data
+        sendFloatOscMessage("/gyroX", gyroX);
+        sendFloatOscMessage("/gyroY", gyroY);
+        sendFloatOscMessage("/gyroZ", gyroZ);
 
-  // 3. SEND DATA VIA OSC
-  // Gyroscope data
-  sendFloatOscMessage("/gyroX", gyroX);
-  sendFloatOscMessage("/gyroY", gyroY);
-  sendFloatOscMessage("/gyroZ", gyroZ);
+        // Accelerometer data
+        sendFloatOscMessage("/accX", accX);
+        sendFloatOscMessage("/accY", accY);
+        sendFloatOscMessage("/accZ", accZ);
 
-  // Accelerometer data
-  sendFloatOscMessage("/accX", accX);
-  sendFloatOscMessage("/accY", accY);
-  sendFloatOscMessage("/accZ", accZ);
+        // Calculated AHRS
+        sendFloatOscMessage("/pitch", pitch);
+        sendFloatOscMessage("/roll", roll);
+        sendFloatOscMessage("/yaw", yaw);
 
-  // Calculated AHRS
-  sendFloatOscMessage("/pitch", pitch);
-  sendFloatOscMessage("/roll", roll);
-  sendFloatOscMessage("/yaw", yaw);
-
-  // Calculated quaternions
-  sendFloatOscMessage("/w", w);
-  sendFloatOscMessage("/x", x);
-  sendFloatOscMessage("/y", y);
-  sendFloatOscMessage("/z", z);
-
-  // Add a short pause (e.g. 100 milliseconds) between cycles
-  // This helps the WiFi router keep up
-  delay(interval);
+        // Calculated quaternions
+        sendFloatOscMessage("/w", w);
+        sendFloatOscMessage("/x", x);
+        sendFloatOscMessage("/y", y);
+        sendFloatOscMessage("/z", z);
+    }
 }
