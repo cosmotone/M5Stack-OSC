@@ -14,7 +14,8 @@ The file must have the following structure:
 #define PASS "your-wifi-network-password"
 #define OUT_IP { 127, 0, 0, 1 }
 ```
-Where `SSID` and `PASS` reflect your WiFi's name and password and `OUT_IP` matches IPv4 address of the device that should receive the OSC data.
+Where `SSID` and `PASS` reflect your WiFi's name and password and `OUT_IP` matches IPv4 address of the device that should receive the OSC data.  
+Receiving device is expected to listen for incomming data on port `8000`
 
 ## Projects
 
