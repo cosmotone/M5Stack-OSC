@@ -15,7 +15,7 @@ The file must have the following structure:
 #define OUT_IP { 127, 0, 0, 1 }
 ```
 Where `SSID` and `PASS` reflect your WiFi's name and password and `OUT_IP` matches IPv4 address of the device that should receive the OSC data.  
-Receiving device is expected to listen for incomming data on port `8000`
+Receiving device is expected to listen for incoming data on port `8000`
 
 ## Projects
 
@@ -26,10 +26,11 @@ Keep in mind that the MPU6886 IMU does not have geomagnetic sensor so the AHRS d
 Created based on: [Edinburgh-College-of-Art/m5stickc-plus-introduction/.../SendFloat_IMU.ino](https://github.com/Edinburgh-College-of-Art/m5stickc-plus-introduction/blob/main/examples/Wireless-Communication/OSC/SendFloat_IMU/SendFloat_IMU.ino)
 
 The following data is transmitted:  
+ - `/ypr` - calculated attitude and heading reference system (AHRS) - formatted for [SPARTA Rotator](https://leomccormack.github.io/sparta-site/docs/plugins/sparta-suite/#rotator)  
+ - `/SceneRotator/quaternions` - calculated quaternions representing rotation - formatted for [IEM Scene Rotator](https://plugins.iem.at/docs/osc/#scenerotator)  
+It's also possible to transmit:  
  - `/gyroX` `/gyroY` `/gyroZ` - gyroscope data  
  - `/accX` `/accY` `/accZ` - accelerometer data  
- - `/pitch` `/roll` `/yaw` - calculated attitude and heading reference system (AHRS)
- - `/w` `/x` `/y` `/z` - calculated quaternions representing rotation
 
 
 ## Dependencies

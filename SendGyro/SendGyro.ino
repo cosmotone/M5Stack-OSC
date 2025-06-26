@@ -125,6 +125,36 @@ void sendFloatOscMessage(const char *address, float message)
     oscMsg.empty();
 }
 
+void sendVec3OscMessage(const char *address, float y, float p, float r)
+{
+    OSCMessage oscMsg(address);
+    oscMsg.add(y);
+    oscMsg.add(p);
+    oscMsg.add(r);
+
+    udp.beginPacket(outIp, outPort);
+    oscMsg.send(udp);
+
+    udp.endPacket();
+    oscMsg.empty();
+}
+
+void sendQuaternionsOscMessage(const char *address, float qw, float qx, float qy, float qz)
+{
+    OSCMessage oscMsg(address);
+    oscMsg.add(qw);
+    oscMsg.add(qx);
+    oscMsg.add(qy);
+    oscMsg.add(qz);
+
+    udp.beginPacket(outIp, outPort);
+    oscMsg.send(udp);
+
+    udp.endPacket();
+    oscMsg.empty();
+}
+
+
 void calibratePosition()
 {
     StickCP2.Speaker.tone(8000, 20);
@@ -138,7 +168,7 @@ void calibratePosition()
     for (int i = 0; i < calibrationCount ; i++) {
         offsetAccX += accX;
         offsetAccY += accY;
-        offsetAccZ += (accZ-1); // Z=1 when M5StickCPlus2 is positioned with its screen facing up
+        offsetAccZ += (accZ-1.0f); // Z=1 when M5StickCPlus2 is positioned with its screen facing up
         StickCP2.Display.print("-");
         delay(10);
     }
@@ -236,7 +266,7 @@ void loop()
 
             pitch = filter.getPitch();
             roll = filter.getRoll();
-            yaw = filter.getYaw();
+            yaw = filter.getYaw() - 180.0f; // move yaw range to -180/+180
 
             // Get quaternions representing the rotation
             filter.getQuaternion(&w, &x, &y, &z);
@@ -276,24 +306,22 @@ void loop()
 
         // 3. SEND DATA VIA OSC
         // Gyroscope data
-        sendFloatOscMessage("/gyroX", gyroX);
-        sendFloatOscMessage("/gyroY", gyroY);
-        sendFloatOscMessage("/gyroZ", gyroZ);
+        // sendFloatOscMessage("/gyroX", gyroX);
+        // sendFloatOscMessage("/gyroY", gyroY);
+        // sendFloatOscMessage("/gyroZ", gyroZ);
 
         // Accelerometer data
-        sendFloatOscMessage("/accX", accX);
-        sendFloatOscMessage("/accY", accY);
-        sendFloatOscMessage("/accZ", accZ);
+        // sendFloatOscMessage("/accX", accX);
+        // sendFloatOscMessage("/accY", accY);
+        // sendFloatOscMessage("/accZ", accZ);
 
         // Calculated AHRS
-        sendFloatOscMessage("/pitch", pitch);
-        sendFloatOscMessage("/roll", roll);
-        sendFloatOscMessage("/yaw", yaw);
+        // sendFloatOscMessage("/pitch", pitch);
+        // sendFloatOscMessage("/roll", roll);
+        // sendFloatOscMessage("/yaw", yaw);
+        sendVec3OscMessage("/ypr", yaw, pitch, roll);
 
         // Calculated quaternions
-        sendFloatOscMessage("/w", w);
-        sendFloatOscMessage("/x", x);
-        sendFloatOscMessage("/y", y);
-        sendFloatOscMessage("/z", z);
+        sendQuaternionsOscMessage("/SceneRotator/quaternions", w, x, y, z);
     }
 }
