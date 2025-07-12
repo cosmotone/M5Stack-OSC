@@ -269,6 +269,7 @@ void loop()
             filter.getQuaternion(&w, &x, &y, &z);
         }
 
+        StickCP2.update();
         // Trigger calibration routine when button A is pressed
         if (StickCP2.BtnA.wasPressed()) {
             calibratePosition();
