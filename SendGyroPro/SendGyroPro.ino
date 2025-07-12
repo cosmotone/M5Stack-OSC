@@ -57,9 +57,9 @@ float gyroX = 0.f;
 float gyroY = 0.f;
 float gyroZ = 0.f;
 
-int16_t magX = 0;
-int16_t magY = 0;
-int16_t magZ = 0;
+float magX = 0;
+float magY = 0;
+float magZ = 0;
 
 float pitch = 0.f;
 float roll = 0.f;
@@ -294,28 +294,29 @@ void loop()
         StickCP2.Display.setCursor(170, 50);
         StickCP2.Display.print("G");
 
-        StickCP2.Display.setCursor(30, 70);
-        StickCP2.Display.println("  Pitch   Roll    Yaw");
+        // Magnetometer data
+        StickCP2.Display.setCursor(30, 60);
+        StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", magX, magY, magZ);
+        StickCP2.Display.setCursor(170, 60);
+        StickCP2.Display.print("uT");
 
         // Calculated AHRS
         StickCP2.Display.setCursor(30, 80);
+        StickCP2.Display.println("  Pitch   Roll    Yaw");
+        StickCP2.Display.setCursor(30, 90);
         StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", pitch, roll, yaw);
 
         // 3. SEND DATA VIA OSC
         // Gyroscope data
-        // sendFloatOscMessage("/gyroX", gyroX);
-        // sendFloatOscMessage("/gyroY", gyroY);
-        // sendFloatOscMessage("/gyroZ", gyroZ);
+        sendVec3OscMessage("/gyro", gyroX, gyroY, gyroZ);
 
         // Accelerometer data
-        // sendFloatOscMessage("/accX", accX);
-        // sendFloatOscMessage("/accY", accY);
-        // sendFloatOscMessage("/accZ", accZ);
+        sendVec3OscMessage("/acc", accX, accY, accZ);
+
+        // Magnetometer data
+        sendVec3OscMessage("/mag", magX, magY, magZ);
 
         // Calculated AHRS
-        // sendFloatOscMessage("/pitch", pitch);
-        // sendFloatOscMessage("/roll", roll);
-        // sendFloatOscMessage("/yaw", yaw);
         sendVec3OscMessage("/ypr", yaw, pitch, roll);
 
         // Calculated quaternions
