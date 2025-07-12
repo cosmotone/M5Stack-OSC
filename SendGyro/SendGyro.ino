@@ -293,7 +293,7 @@ void loop()
 
         // Accelerometer data
         StickCP2.Display.setCursor(30, 50);
-        StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", accX, accY, accZ);
+        StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", compAccX, compAccY, compAccZ);
         StickCP2.Display.setCursor(170, 50);
         StickCP2.Display.print("G");
 
@@ -309,7 +309,7 @@ void loop()
         sendVec3OscMessage("/gyro", gyroX, gyroY, gyroZ);
 
         // Accelerometer data
-        sendVec3OscMessage("/acc", accX, accY, accZ);
+        sendVec3OscMessage("/acc", compAccX, compAccY, compAccZ);
 
         // Calculated AHRS
         sendVec3OscMessage("/ypr", yaw, pitch, roll);
