@@ -248,10 +248,17 @@ void loop()
         if (bmi270.accelerationAvailable() && bmi270.gyroscopeAvailable() && bmi270.magneticFieldAvailable()) {
             // Acceleration data from BMI270
             bmi270.readAcceleration(accX, accY, accZ);
+            accX = accX * -1.0f; // Invert acc X axis
+            accY = accY * -1.0f; // Invert acc Y axis
+
             // Gyroscope data from BMI270
             bmi270.readGyroscope(gyroX, gyroY, gyroZ);
+            gyroX = gyroX * -1.0f; // Invert gyro X axis
+            gyroY = gyroY * -1.0f; // Invert gyro Y axis
+
             // Magnetometer data from BMI270(BMM150)
             bmi270.readMagneticField(magX, magY, magZ);
+            magY = magY * -1.0f; // Invert mag Y axis
 
             // Compensate accelerometer values with the average offset measured during calibration
             compAccX = accX - offsetAccX;
