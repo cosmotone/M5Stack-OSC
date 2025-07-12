@@ -306,19 +306,12 @@ void loop()
 
         // 3. SEND DATA VIA OSC
         // Gyroscope data
-        // sendFloatOscMessage("/gyroX", gyroX);
-        // sendFloatOscMessage("/gyroY", gyroY);
-        // sendFloatOscMessage("/gyroZ", gyroZ);
+        sendVec3OscMessage("/gyro", gyroX, gyroY, gyroZ);
 
         // Accelerometer data
-        // sendFloatOscMessage("/accX", accX);
-        // sendFloatOscMessage("/accY", accY);
-        // sendFloatOscMessage("/accZ", accZ);
+        sendVec3OscMessage("/acc", accX, accY, accZ);
 
         // Calculated AHRS
-        // sendFloatOscMessage("/pitch", pitch);
-        // sendFloatOscMessage("/roll", roll);
-        // sendFloatOscMessage("/yaw", yaw);
         sendVec3OscMessage("/ypr", yaw, pitch, roll);
 
         // Calculated quaternions
