@@ -164,6 +164,22 @@ void sendQuaternionsOscMessage(const char *address, float qw, float qx, float qy
     oscMsg.empty();
 }
 
+void getImuData()
+{
+    // Acceleration data from BMI270
+    bmi270.readAcceleration(accX, accY, accZ);
+    accX = accX * -1.0f; // Invert acc X axis
+    accY = accY * -1.0f; // Invert acc Y axis
+
+    // Gyroscope data from BMI270
+    bmi270.readGyroscope(gyroX, gyroY, gyroZ);
+    gyroX = gyroX * -1.0f; // Invert gyro X axis
+    gyroY = gyroY * -1.0f; // Invert gyro Y axis
+
+    // Magnetometer data from BMI270(BMM150)
+    bmi270.readMagneticField(magX, magY, magZ);
+    magY = magY * -1.0f; // Invert mag Y axis
+}
 
 void calibratePosition()
 {
@@ -176,9 +192,12 @@ void calibratePosition()
     // Measures accelerometer values within (100 * 10) ms window
     int calibrationCount = 100;
     for (int i = 0; i < calibrationCount ; i++) {
-        offsetAccX += accX;
-        offsetAccY += accY;
-        offsetAccZ += (accZ-1.0f); // Z=1 when M5StickCPlus2 is positioned with its screen facing up
+        if (bmi270.accelerationAvailable() && bmi270.gyroscopeAvailable() && bmi270.magneticFieldAvailable()) {
+            getImuData();
+            offsetAccX += accX;
+            offsetAccY += accY;
+            offsetAccZ += (accZ-1.0f); // Z=1 when M5StickCPlus2 is positioned with its screen facing up
+        }
         StickCP2.Display.print("-");
         delay(10);
     }
@@ -246,19 +265,7 @@ void loop()
         
         // 1. GET IMU DATA
         if (bmi270.accelerationAvailable() && bmi270.gyroscopeAvailable() && bmi270.magneticFieldAvailable()) {
-            // Acceleration data from BMI270
-            bmi270.readAcceleration(accX, accY, accZ);
-            accX = accX * -1.0f; // Invert acc X axis
-            accY = accY * -1.0f; // Invert acc Y axis
-
-            // Gyroscope data from BMI270
-            bmi270.readGyroscope(gyroX, gyroY, gyroZ);
-            gyroX = gyroX * -1.0f; // Invert gyro X axis
-            gyroY = gyroY * -1.0f; // Invert gyro Y axis
-
-            // Magnetometer data from BMI270(BMM150)
-            bmi270.readMagneticField(magX, magY, magZ);
-            magY = magY * -1.0f; // Invert mag Y axis
+            getImuData();
 
             // Compensate accelerometer values with the average offset measured during calibration
             compAccX = accX - offsetAccX;
@@ -297,7 +304,7 @@ void loop()
 
         // Accelerometer data
         StickCP2.Display.setCursor(30, 50);
-        StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", accX, accY, accZ);
+        StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", compAccX, compAccY, compAccZ);
         StickCP2.Display.setCursor(170, 50);
         StickCP2.Display.print("G");
 
@@ -318,7 +325,7 @@ void loop()
         sendVec3OscMessage("/gyro", gyroX, gyroY, gyroZ);
 
         // Accelerometer data
-        sendVec3OscMessage("/acc", accX, accY, accZ);
+        sendVec3OscMessage("/acc", compAccX, compAccY, compAccZ);
 
         // Magnetometer data
         sendVec3OscMessage("/mag", magX, magY, magZ);
