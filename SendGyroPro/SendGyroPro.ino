@@ -2,11 +2,9 @@
  * @file SendGyroPro.ino
  * @brief Send M5 IMU Pro Mini data via OSC messages.
  *
- *
  * @Hardwares:M5StickCPlus2 with M5 IMU Pro Mini
  * @Dependent Library:
  * M5_IMU_PRO: https://github.com/m5stack/M5Unit-IMU-Pro-Mini
- * Adafruit BMP280 Library: https://github.com/adafruit/Adafruit_BMP280_Library
  * M5StickCPlus2 library: https://github.com/m5stack/M5StickCPlus2
  * OSC library: https://github.com/CNMAT/OSC
  * Adafruit AHRS: https://github.com/adafruit/Adafruit_AHRS
@@ -27,10 +25,8 @@ Adafruit_Mahony filter;
 
 // IMU Pro
 #define BIM270_SENSOR_ADDR 0x68
-#define BMP280_SENSOR_ADDR 0x76
 
 BMI270::BMI270 bmi270;
-Adafruit_BMP280 bmp(&Wire);
 
 // Set interval at which the data will be gathered and sent (in ms)
 const int interval = 100;
@@ -207,16 +203,6 @@ void setup() {
     StickCP2.begin(cfg);
 
     StickCP2.Ex_I2C.begin();
-
-    unsigned status = bmp.begin(BMP280_SENSOR_ADDR);
-    if (!status) {
-        Serial.println(
-            F("Could not find a valid BMP280 sensor, check wiring or "
-                "try a different address!"));
-        Serial.print("SensorID was: 0x");
-        Serial.println(bmp.sensorID(), 16);
-        while (1) delay(10);
-    }
 
     bmi270.init(I2C_NUM_0, BIM270_SENSOR_ADDR);
 
