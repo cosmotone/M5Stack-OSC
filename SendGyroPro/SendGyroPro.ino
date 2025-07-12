@@ -48,6 +48,10 @@ WiFiUDP udp;
 // Network port for incoming messages
 const unsigned int inPort = 8000; // This is not strictly needed for sending messages
 
+// Magnetometer data range
+float minMag = -50.f;
+float maxMag = 50.f;
+
 // Variables for storing the different bits of IMU data
 float accX = 0.f;
 float accY = 0.f;
@@ -57,9 +61,20 @@ float gyroX = 0.f;
 float gyroY = 0.f;
 float gyroZ = 0.f;
 
-float magX = 0;
-float magY = 0;
-float magZ = 0;
+float magX = 0.f;
+float magY = 0.f;
+float magZ = 0.f;
+
+float minMagX = minMag;
+float maxMagX = maxMag;
+float minMagY = minMag;
+float maxMagY = maxMag;
+float minMagZ = minMag;
+float maxMagZ = maxMag;
+
+float normMagX = 0.f;
+float normMagY = 0.f;
+float normMagZ = 0.f;
 
 float pitch = 0.f;
 float roll = 0.f;
@@ -211,6 +226,57 @@ void calibratePosition()
     StickCP2.Display.clear();
 }
 
+void calibrateMagnetometer()
+{
+    StickCP2.Speaker.tone(8000, 20);
+    delay(200);
+    StickCP2.Speaker.tone(8000, 20);
+    StickCP2.Display.clear();
+    StickCP2.Display.setCursor(40, 30);
+    StickCP2.Display.println("Calibrating magnetometer");
+    StickCP2.Display.setCursor(0, 40);
+    // Initialize min and max values
+    minMagX = magX;
+    maxMagX = magX;
+    minMagY = magY;
+    maxMagY = magY;
+    minMagZ = magZ;
+    maxMagZ = magZ;
+    // Measures magnetometer values within (300 * 100) ms window
+    int calibrationCount = 300;
+    for (int i = 0; i < calibrationCount ; ++i) {
+        if (bmi270.accelerationAvailable() && bmi270.gyroscopeAvailable() && bmi270.magneticFieldAvailable()) {
+            getImuData();
+            if (magX < minMagX) minMagX = magX;
+            if (magX > maxMagX) maxMagX = magX;
+            if (magY < minMagY) minMagY = magY;
+            if (magY > maxMagY) maxMagY = magY;
+            if (magZ < minMagZ) minMagZ = magZ;
+            if (magZ > maxMagZ) maxMagZ = magZ;
+        }
+        StickCP2.Display.print(".");
+        delay(100);
+    }
+    StickCP2.Speaker.tone(8000, 20);
+    delay(200);
+    StickCP2.Speaker.tone(8000, 20);
+    StickCP2.Display.clear();
+    StickCP2.Display.setCursor(40, 30);
+    StickCP2.Display.println("Calibrating magnetometer");
+    StickCP2.Display.setCursor(40, 50);
+    StickCP2.Display.printf("%6.2f  %6.2f  %6.2f      ", minMagX, minMagY, minMagZ);
+    StickCP2.Display.setCursor(40, 60);
+    StickCP2.Display.printf("%6.2f  %6.2f  %6.2f      ", maxMagX, maxMagY, maxMagZ);
+    delay(2000);
+    StickCP2.Display.clear();
+}
+
+float normalizeMag(float value, float inMin, float inMax)
+{
+    float scaled = (value - inMin) / (inMax - inMin);
+    return minMag + scaled * (maxMag - minMag);
+}
+
 void IRAM_ATTR onTimer() {
   portENTER_CRITICAL_ISR(&timerMux);
   interruptCounter++;
@@ -272,8 +338,13 @@ void loop()
             compAccY = accY - offsetAccY;
             compAccZ = accZ - offsetAccZ;
 
+            // Normalize magnetometer values
+            normMagX = normalizeMag(magX, minMagX, maxMagX);
+            normMagY = normalizeMag(magY, minMagY, maxMagY);
+            normMagZ = normalizeMag(magZ, minMagZ, maxMagZ);
+
             // Calculate pitch, roll and yaw based on accelerometer, gyroscope and magnetometer readings using Mahony's AHRS algorithm
-            filter.update(gyroX, gyroY, gyroZ, compAccX, compAccY, compAccZ, magX, magY, magZ);
+            filter.update(gyroX, gyroY, gyroZ, compAccX, compAccY, compAccZ, normMagX, normMagY, normMagZ);
 
             pitch = filter.getPitch();
             roll = filter.getRoll();
@@ -284,9 +355,14 @@ void loop()
         }
 
         StickCP2.update();
-        // Trigger calibration routine when button A is pressed
+        // Trigger accelerometer calibration routine when button A is pressed
         if (StickCP2.BtnA.wasPressed()) {
             calibratePosition();
+        }
+
+        // Trigger magnetometer calibration routine when button B is pressed
+        if (StickCP2.BtnB.wasPressed()) {
+            calibrateMagnetometer();
         }
 
         // 2. PRINT DATA TO M5 LCD (optional)
@@ -310,7 +386,7 @@ void loop()
 
         // Magnetometer data
         StickCP2.Display.setCursor(30, 60);
-        StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", magX, magY, magZ);
+        StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", normMagX, normMagY, normMagZ);
         StickCP2.Display.setCursor(170, 60);
         StickCP2.Display.print("uT");
 
@@ -328,7 +404,7 @@ void loop()
         sendVec3OscMessage("/acc", compAccX, compAccY, compAccZ);
 
         // Magnetometer data
-        sendVec3OscMessage("/mag", magX, magY, magZ);
+        sendVec3OscMessage("/mag", normMagX, normMagY, normMagZ);
 
         // Calculated AHRS
         sendVec3OscMessage("/ypr", yaw, pitch, roll);
