@@ -109,12 +109,16 @@ bool connectToWiFi()
 /// Send float OSC Message
 /// - function for sending float messages via OSC
 /// @param address (const char*) message tag
-/// @param message (float) message to send
-void sendFloatOscMessage(const char *address, float message)
+/// @param messX (float) x component of the message to send
+/// @param messY (float) y component of the message to send
+/// @param messZ (float) z component of the message to send
+void sendVec3OscMessage(const char *address, float messX, float messY, float messZ)
 {
     // init message
     OSCMessage oscMsg(address);
-    oscMsg.add(message);
+    oscMsg.add(messX);
+    oscMsg.add(messY);
+    oscMsg.add(messZ);
 
     // send message
     udp.beginPacket(outIp, outPort);
@@ -125,27 +129,13 @@ void sendFloatOscMessage(const char *address, float message)
     oscMsg.empty();
 }
 
-void sendVec3OscMessage(const char *address, float y, float p, float r)
+void sendVec4OscMessage(const char *address, float messX, float messY, float messZ, float messW)
 {
     OSCMessage oscMsg(address);
-    oscMsg.add(y);
-    oscMsg.add(p);
-    oscMsg.add(r);
-
-    udp.beginPacket(outIp, outPort);
-    oscMsg.send(udp);
-
-    udp.endPacket();
-    oscMsg.empty();
-}
-
-void sendQuaternionsOscMessage(const char *address, float qw, float qx, float qy, float qz)
-{
-    OSCMessage oscMsg(address);
-    oscMsg.add(qw);
-    oscMsg.add(qx);
-    oscMsg.add(qy);
-    oscMsg.add(qz);
+    oscMsg.add(messX);
+    oscMsg.add(messY);
+    oscMsg.add(messZ);
+    oscMsg.add(messW);
 
     udp.beginPacket(outIp, outPort);
     oscMsg.send(udp);
@@ -315,6 +305,6 @@ void loop()
         sendVec3OscMessage("/ypr", yaw, pitch, roll);
 
         // Calculated quaternions
-        sendQuaternionsOscMessage("/SceneRotator/quaternions", w, x, y, z);
+        sendVec4OscMessage("/SceneRotator/quaternions", w, x, y, z);
     }
 }
