@@ -10,7 +10,8 @@
 //     - Send M5StickCPlus2 IMU data via OSC messages
 //=============================================================
 
-#include <M5StickCPlus2.h>
+#include <M5Unified.h>
+#include <M5GFX.h>
 
 #include <WiFi.h>
 #include <WiFiUdp.h>
@@ -18,6 +19,8 @@
 #include <Adafruit_AHRS_Mahony.h>
 
 #include "wifi_config.h" // config with WiFi network's information
+
+M5GFX display;
 
 // Mahony filter
 Adafruit_Mahony filter;
@@ -76,7 +79,7 @@ float compAccZ = 0.f;
 /// @return status (bool) true = successful, false = failed
 bool connectToWiFi()
 {
-    StickCP2.Display.print("Connecting");
+    display.print("Connecting");
 
     // initialise - WIFI_STA = Station Mode
     WiFi.mode(WIFI_STA);
@@ -87,19 +90,19 @@ bool connectToWiFi()
 
     // while not connected to WiFi AND before timeout
     while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 30000) {
-        StickCP2.Display.print(".");
+        Display.print(".");
         delay(400);
     }
 
     // Print status to LCD
     if (WiFi.status() != WL_CONNECTED) {
-        StickCP2.Display.println("\nErr: Failed to connect");
+        Display.println("\nErr: Failed to connect");
         delay(2000);
         return false;
     } else {
-        StickCP2.Display.println("\nConnected to:");
-        StickCP2.Display.println(ssid);
-        StickCP2.Display.println(WiFi.localIP());
+        Display.println("\nConnected to:");
+        Display.println(ssid);
+        Display.println(WiFi.localIP());
 
         delay(2000);
         return true;
@@ -147,29 +150,29 @@ void sendVec4OscMessage(const char *address, float messX, float messY, float mes
 
 void calibratePosition()
 {
-    StickCP2.Speaker.tone(8000, 20);
-    StickCP2.Display.clear();
-    StickCP2.Display.setCursor(40, 30);
-    StickCP2.Display.println("Calibrating position");
+    Speaker.tone(8000, 20);
+    Display.clear();
+    Display.setCursor(40, 30);
+    Display.println("Calibrating position");
     filter.setQuaternion(1.0f, 0.0f, 0.0f, 0.0f); // Assuming that the M5StickCPlus2 is positioned with its screen facing up
-    StickCP2.Display.setCursor(0, 40);
+    Display.setCursor(0, 40);
     // Measures accelerometer values within (100 * 10) ms window
     int calibrationCount = 100;
     for (int i = 0; i < calibrationCount ; i++) {
         offsetAccX += accX;
         offsetAccY += accY;
         offsetAccZ += (accZ-1.0f); // Z=1 when M5StickCPlus2 is positioned with its screen facing up
-        StickCP2.Display.print("-");
+        Display.print("-");
         delay(10);
     }
     // Returns average accelerometer values
     offsetAccX /= calibrationCount;
     offsetAccY /= calibrationCount;
     offsetAccZ /= calibrationCount;
-    StickCP2.Display.setCursor(40, 70);
-    StickCP2.Display.printf("%6.2f  %6.2f  %6.2f      ", offsetAccX, offsetAccY, offsetAccZ);
+    Display.setCursor(40, 70);
+    Display.printf("%6.2f  %6.2f  %6.2f      ", offsetAccX, offsetAccY, offsetAccZ);
     delay(1000);
-    StickCP2.Display.clear();
+    Display.clear();
 }
 
 void IRAM_ATTR onTimer() {
@@ -183,7 +186,7 @@ void IRAM_ATTR onTimer() {
 void setup()
 {
     auto cfg = M5.config();
-    StickCP2.begin(cfg);
+    begin(cfg);
 
     filter.begin(1000/interval); // Set filter update frequency (Hz)
 
@@ -202,16 +205,13 @@ void setup()
     // Use first (0) hardware timer on ESP32
     // Counts every microsecond 
     // true: count up 
-    timer = timerBegin(0 ,getApbFrequency() / 1000000 ,true );
+    timer = timerBegin(1000000 );
 
     // Set timer interrupt 
     timerAttachInterrupt(timer, &onTimer, true );
 
     // Set timer in microseconds 
-    timerAlarmWrite(timer, 1000 * interval, true );
-
-    // Start the timer
-    timerAlarmEnable(timer);
+    timerAlarm(timer, 1000 * interval, true, 0 );
 }
 
 //=============================================================
@@ -224,9 +224,9 @@ void loop()
         portEXIT_CRITICAL(&timerMux);
         
         // 1. GET IMU DATA
-        auto imu_update = StickCP2.Imu.update();
+        auto imu_update = Imu.update();
         if (imu_update) {
-            auto data = StickCP2.Imu.getImuData();
+            auto data = Imu.getImuData();
 
             // The data obtained by getImuData can be used as follows.
             accX = data.accel.x; // accel x-axis value.
@@ -262,37 +262,37 @@ void loop()
             filter.getQuaternion(&w, &x, &y, &z);
         }
 
-        StickCP2.update();
+        update();
         // Trigger calibration routine when button A is pressed
-        if (StickCP2.BtnA.wasPressed()) {
+        if (BtnA.wasPressed()) {
             calibratePosition();
         }
 
         // 2. PRINT DATA TO M5 LCD (optional)
-        StickCP2.Display.setCursor(80, 15);
-        StickCP2.Display.println("SEND GYRO");
+        Display.setCursor(80, 15);
+        Display.println("SEND GYRO");
 
-        StickCP2.Display.setCursor(30, 30);
-        StickCP2.Display.println("  X       Y       Z");
+        Display.setCursor(30, 30);
+        Display.println("  X       Y       Z");
 
         // Gyroscope data
-        StickCP2.Display.setCursor(30, 40);
-        StickCP2.Display.printf("%6.2f  %6.2f  %6.2f      ", gyroX, gyroY, gyroZ);
-        StickCP2.Display.setCursor(170, 40);
-        StickCP2.Display.print("o/s");
+        Display.setCursor(30, 40);
+        Display.printf("%6.2f  %6.2f  %6.2f      ", gyroX, gyroY, gyroZ);
+        Display.setCursor(170, 40);
+        Display.print("o/s");
 
         // Accelerometer data
-        StickCP2.Display.setCursor(30, 50);
-        StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", compAccX, compAccY, compAccZ);
-        StickCP2.Display.setCursor(170, 50);
-        StickCP2.Display.print("G");
+        Display.setCursor(30, 50);
+        Display.printf(" %5.2f   %5.2f   %5.2f   ", compAccX, compAccY, compAccZ);
+        Display.setCursor(170, 50);
+        Display.print("G");
 
-        StickCP2.Display.setCursor(30, 70);
-        StickCP2.Display.println("  Pitch   Roll    Yaw");
+        Display.setCursor(30, 70);
+        Display.println("  Pitch   Roll    Yaw");
 
         // Calculated AHRS
-        StickCP2.Display.setCursor(30, 80);
-        StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", pitch, roll, yaw);
+        Display.setCursor(30, 80);
+        Display.printf(" %5.2f   %5.2f   %5.2f   ", pitch, roll, yaw);
 
         // 3. SEND DATA VIA OSC
         // Gyroscope data
