@@ -20,7 +20,7 @@
 
 #include "wifi_config.h" // config with WiFi network's information
 
-M5GFX display;
+//M5GFX M5.Display;
 
 // Mahony filter
 Adafruit_Mahony filter;
@@ -79,7 +79,7 @@ float compAccZ = 0.f;
 /// @return status (bool) true = successful, false = failed
 bool connectToWiFi()
 {
-    display.print("Connecting");
+    M5.Display.print("Connecting");
 
     // initialise - WIFI_STA = Station Mode
     WiFi.mode(WIFI_STA);
@@ -90,19 +90,19 @@ bool connectToWiFi()
 
     // while not connected to WiFi AND before timeout
     while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 30000) {
-        Display.print(".");
+        M5.Display.print(".");
         delay(400);
     }
 
     // Print status to LCD
     if (WiFi.status() != WL_CONNECTED) {
-        Display.println("\nErr: Failed to connect");
+        M5.Display.println("\nErr: Failed to connect");
         delay(2000);
         return false;
     } else {
-        Display.println("\nConnected to:");
-        Display.println(ssid);
-        Display.println(WiFi.localIP());
+        M5.Display.println("\nConnected to:");
+        M5.Display.println(ssid);
+        M5.Display.println(WiFi.localIP());
 
         delay(2000);
         return true;
@@ -150,29 +150,29 @@ void sendVec4OscMessage(const char *address, float messX, float messY, float mes
 
 void calibratePosition()
 {
-    Speaker.tone(8000, 20);
-    Display.clear();
-    Display.setCursor(40, 30);
-    Display.println("Calibrating position");
+    M5.Speaker.tone(8000, 20);
+    M5.Display.clear();
+    M5.Display.setCursor(40, 30);
+    M5.Display.println("Calibrating position");
     filter.setQuaternion(1.0f, 0.0f, 0.0f, 0.0f); // Assuming that the M5StickCPlus2 is positioned with its screen facing up
-    Display.setCursor(0, 40);
+    M5.Display.setCursor(0, 40);
     // Measures accelerometer values within (100 * 10) ms window
     int calibrationCount = 100;
     for (int i = 0; i < calibrationCount ; i++) {
         offsetAccX += accX;
         offsetAccY += accY;
         offsetAccZ += (accZ-1.0f); // Z=1 when M5StickCPlus2 is positioned with its screen facing up
-        Display.print("-");
+        M5.Display.print("-");
         delay(10);
     }
     // Returns average accelerometer values
     offsetAccX /= calibrationCount;
     offsetAccY /= calibrationCount;
     offsetAccZ /= calibrationCount;
-    Display.setCursor(40, 70);
-    Display.printf("%6.2f  %6.2f  %6.2f      ", offsetAccX, offsetAccY, offsetAccZ);
+    M5.Display.setCursor(40, 70);
+    M5.Display.printf("%6.2f  %6.2f  %6.2f      ", offsetAccX, offsetAccY, offsetAccZ);
     delay(1000);
-    Display.clear();
+    M5.Display.clear();
 }
 
 void IRAM_ATTR onTimer() {
@@ -186,7 +186,7 @@ void IRAM_ATTR onTimer() {
 void setup()
 {
     auto cfg = M5.config();
-    begin(cfg);
+    M5.begin(cfg);
 
     filter.begin(1000/interval); // Set filter update frequency (Hz)
 
@@ -195,12 +195,12 @@ void setup()
     udp.begin(inPort);
 
     delay(1000);
-    StickCP2.Display.fillScreen(BLACK);
+    M5.Display.fillScreen(BLACK);
 
-    // Display setup
-    StickCP2.Display.setRotation(3);
-    StickCP2.Display.fillScreen(BLACK);
-    StickCP2.Display.setTextSize(1);
+    // M5.Display setup
+    M5.Display.setRotation(3);
+    M5.Display.fillScreen(BLACK);
+    M5.Display.setTextSize(1);
 
     // Use first (0) hardware timer on ESP32
     // Counts every microsecond 
@@ -208,7 +208,7 @@ void setup()
     timer = timerBegin(1000000 );
 
     // Set timer interrupt 
-    timerAttachInterrupt(timer, &onTimer, true );
+    timerAttachInterrupt(timer, &onTimer );
 
     // Set timer in microseconds 
     timerAlarm(timer, 1000 * interval, true, 0 );
@@ -224,9 +224,9 @@ void loop()
         portEXIT_CRITICAL(&timerMux);
         
         // 1. GET IMU DATA
-        auto imu_update = Imu.update();
+        auto imu_update = M5.Imu.update();
         if (imu_update) {
-            auto data = Imu.getImuData();
+            auto data = M5.Imu.getImuData();
 
             // The data obtained by getImuData can be used as follows.
             accX = data.accel.x; // accel x-axis value.
@@ -262,37 +262,37 @@ void loop()
             filter.getQuaternion(&w, &x, &y, &z);
         }
 
-        update();
+        M5.update();
         // Trigger calibration routine when button A is pressed
-        if (BtnA.wasPressed()) {
+        if (M5.BtnA.wasPressed()) {
             calibratePosition();
         }
 
         // 2. PRINT DATA TO M5 LCD (optional)
-        Display.setCursor(80, 15);
-        Display.println("SEND GYRO");
+        M5.Display.setCursor(80, 15);
+        M5.Display.println("SEND GYRO");
 
-        Display.setCursor(30, 30);
-        Display.println("  X       Y       Z");
+        M5.Display.setCursor(30, 30);
+        M5.Display.println("  X       Y       Z");
 
         // Gyroscope data
-        Display.setCursor(30, 40);
-        Display.printf("%6.2f  %6.2f  %6.2f      ", gyroX, gyroY, gyroZ);
-        Display.setCursor(170, 40);
-        Display.print("o/s");
+        M5.Display.setCursor(30, 40);
+        M5.Display.printf("%6.2f  %6.2f  %6.2f      ", gyroX, gyroY, gyroZ);
+        M5.Display.setCursor(170, 40);
+        M5.Display.print("o/s");
 
         // Accelerometer data
-        Display.setCursor(30, 50);
-        Display.printf(" %5.2f   %5.2f   %5.2f   ", compAccX, compAccY, compAccZ);
-        Display.setCursor(170, 50);
-        Display.print("G");
+        M5.Display.setCursor(30, 50);
+        M5.Display.printf(" %5.2f   %5.2f   %5.2f   ", compAccX, compAccY, compAccZ);
+        M5.Display.setCursor(170, 50);
+        M5.Display.print("G");
 
-        Display.setCursor(30, 70);
-        Display.println("  Pitch   Roll    Yaw");
+        M5.Display.setCursor(30, 70);
+        M5.Display.println("  Pitch   Roll    Yaw");
 
         // Calculated AHRS
-        Display.setCursor(30, 80);
-        Display.printf(" %5.2f   %5.2f   %5.2f   ", pitch, roll, yaw);
+        M5.Display.setCursor(30, 80);
+        M5.Display.printf(" %5.2f   %5.2f   %5.2f   ", pitch, roll, yaw);
 
         // 3. SEND DATA VIA OSC
         // Gyroscope data
