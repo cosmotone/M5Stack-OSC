@@ -197,7 +197,7 @@ void calibratePosition()
     // Measures accelerometer values within (100 * 10) ms window
     int calibrationCount = 100;
     for (int i = 0; i < calibrationCount ; i++) {
-        if (M5.Imu.accelerationAvailable() && M5.Imu.gyroscopeAvailable() && M5.Imu.magneticFieldAvailable()) {
+        if (M5.Imu.getAccel(&accX, &accY, &accZ ) && M5.Imu.getGyro(&gyroX, &gyroY, &gyroZ ) && M5.Imu.getMag(&magX, &magY, &magZ )) {
             getImuData();
             offsetAccX += accX;
             offsetAccY += accY;
@@ -235,7 +235,7 @@ void calibrateMagnetometer()
     // Measures magnetometer values within (300 * 100) ms window
     int calibrationCount = 300;
     for (int i = 0; i < calibrationCount ; ++i) {
-        if (M5.Imu.accelerationAvailable() && M5.Imu.gyroscopeAvailable() && M5.Imu.magneticFieldAvailable()) {
+        if (M5.Imu.getAccel(&accX, &accY, &accZ ) && M5.Imu.getGyro(&gyroX, &gyroY, &gyroZ ) && M5.Imu.getMag(&magX, &magY, &magZ )) {
             getImuData();
             if (magX < minMagX) minMagX = magX;
             if (magX > maxMagX) maxMagX = magX;
@@ -321,7 +321,7 @@ void loop()
         portEXIT_CRITICAL(&timerMux);
         
         // 1. GET IMU DATA
-        if (M5.Imu.accelerationAvailable() && M5.Imu.gyroscopeAvailable() && M5.Imu.magneticFieldAvailable()) {
+        if (M5.Imu.getAccel(&accX, &accY, &accZ ) && M5.Imu.getGyro(&gyroX, &gyroY, &gyroZ ) && M5.Imu.getMag(&magX, &magY, &magZ )) {
             getImuData();
 
             // Compensate accelerometer values with the average offset measured during calibration
