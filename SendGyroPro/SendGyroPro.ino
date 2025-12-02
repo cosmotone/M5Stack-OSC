@@ -10,8 +10,8 @@
  * Adafruit AHRS: https://github.com/adafruit/Adafruit_AHRS
  */
 
-#include <M5StickCPlus2.h>
-#include "M5_IMU_PRO.h"
+#include <M5Unified.h>
+//#include "M5_IMU_PRO.h"
 
 #include <WiFi.h>
 #include <WiFiUdp.h>
@@ -24,9 +24,9 @@
 Adafruit_Mahony filter;
 
 // IMU Pro
-#define BIM270_SENSOR_ADDR 0x68
+//#define BIM270_SENSOR_ADDR 0x68
 
-BMI270::BMI270 bmi270;
+//BMI270::BMI270 bmi270;
 
 // Set interval at which the data will be gathered and sent (in ms)
 const int interval = 100;
@@ -101,7 +101,7 @@ float compAccZ = 0.f;
 /// @return status (bool) true = successful, false = failed
 bool connectToWiFi()
 {
-    StickCP2.Display.print("Connecting");
+    M5.Display.print("Connecting");
 
     // initialise - WIFI_STA = Station Mode
     WiFi.mode(WIFI_STA);
@@ -112,19 +112,19 @@ bool connectToWiFi()
 
     // while not connected to WiFi AND before timeout
     while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 30000) {
-        StickCP2.Display.print(".");
+        M5.Display.print(".");
         delay(400);
     }
 
     // Print status to LCD
     if (WiFi.status() != WL_CONNECTED) {
-        StickCP2.Display.println("\nErr: Failed to connect");
+        M5.Display.println("\nErr: Failed to connect");
         delay(2000);
         return false;
     } else {
-        StickCP2.Display.println("\nConnected to:");
-        StickCP2.Display.println(ssid);
-        StickCP2.Display.println(WiFi.localIP());
+        M5.Display.println("\nConnected to:");
+        M5.Display.println(ssid);
+        M5.Display.println(WiFi.localIP());
 
         delay(2000);
         return true;
@@ -171,60 +171,60 @@ void sendVec4OscMessage(const char *address, float messX, float messY, float mes
 
 void getImuData()
 {
+   // Obtain data on the current value of the IMU.
+    auto data = M5.Imu.getImuData();
+
     // Acceleration data from BMI270
-    bmi270.readAcceleration(accX, accY, accZ);
-    accX = accX * -1.0f; // Invert acc X axis
-    accY = accY * -1.0f; // Invert acc Y axis
+    accX = data.accel.x * -1.0f; // Invert acc X axis
+    accY = data.accel.y * -1.0f; // Invert acc Y axis
 
     // Gyroscope data from BMI270
-    bmi270.readGyroscope(gyroX, gyroY, gyroZ);
-    gyroX = gyroX * -1.0f; // Invert gyro X axis
-    gyroY = gyroY * -1.0f; // Invert gyro Y axis
+    gyroX = data.gyro.x * -1.0f; // Invert gyro X axis
+    gyroY = data.gyro.y * -1.0f; // Invert gyro Y axis
 
     // Magnetometer data from BMI270(BMM150)
-    bmi270.readMagneticField(magX, magY, magZ);
-    magY = magY * -1.0f; // Invert mag Y axis
+    magY = data.mag.y * -1.0f; // Invert mag Y axis
 }
 
 void calibratePosition()
 {
-    StickCP2.Speaker.tone(8000, 20);
-    StickCP2.Display.clear();
-    StickCP2.Display.setCursor(40, 30);
-    StickCP2.Display.println("Calibrating position");
+    M5.Speaker.tone(8000, 20);
+    M5.Display.clear();
+    M5.Display.setCursor(40, 30);
+    M5.Display.println("Calibrating position");
     filter.setQuaternion(1.0f, 0.0f, 0.0f, 0.0f); // Assuming that the M5StickCPlus2 is positioned with its screen facing up
-    StickCP2.Display.setCursor(0, 40);
+    M5.Display.setCursor(0, 40);
     // Measures accelerometer values within (100 * 10) ms window
     int calibrationCount = 100;
     for (int i = 0; i < calibrationCount ; i++) {
-        if (bmi270.accelerationAvailable() && bmi270.gyroscopeAvailable() && bmi270.magneticFieldAvailable()) {
+        if (M5.Imu.accelerationAvailable() && M5.Imu.gyroscopeAvailable() && M5.Imu.magneticFieldAvailable()) {
             getImuData();
             offsetAccX += accX;
             offsetAccY += accY;
             offsetAccZ += (accZ-1.0f); // Z=1 when M5StickCPlus2 is positioned with its screen facing up
         }
-        StickCP2.Display.print("-");
+        M5.Display.print("-");
         delay(10);
     }
     // Returns average accelerometer values
     offsetAccX /= calibrationCount;
     offsetAccY /= calibrationCount;
     offsetAccZ /= calibrationCount;
-    StickCP2.Display.setCursor(40, 70);
-    StickCP2.Display.printf("%6.2f  %6.2f  %6.2f      ", offsetAccX, offsetAccY, offsetAccZ);
+    M5.Display.setCursor(40, 70);
+    M5.Display.printf("%6.2f  %6.2f  %6.2f      ", offsetAccX, offsetAccY, offsetAccZ);
     delay(1000);
-    StickCP2.Display.clear();
+    M5.Display.clear();
 }
 
 void calibrateMagnetometer()
 {
-    StickCP2.Speaker.tone(8000, 20);
+    M5.Speaker.tone(8000, 20);
     delay(200);
-    StickCP2.Speaker.tone(8000, 20);
-    StickCP2.Display.clear();
-    StickCP2.Display.setCursor(40, 30);
-    StickCP2.Display.println("Calibrating magnetometer");
-    StickCP2.Display.setCursor(0, 40);
+    M5.Speaker.tone(8000, 20);
+    M5.Display.clear();
+    M5.Display.setCursor(40, 30);
+    M5.Display.println("Calibrating magnetometer");
+    M5.Display.setCursor(0, 40);
     // Initialize min and max values
     minMagX = magX;
     maxMagX = magX;
@@ -235,7 +235,7 @@ void calibrateMagnetometer()
     // Measures magnetometer values within (300 * 100) ms window
     int calibrationCount = 300;
     for (int i = 0; i < calibrationCount ; ++i) {
-        if (bmi270.accelerationAvailable() && bmi270.gyroscopeAvailable() && bmi270.magneticFieldAvailable()) {
+        if (M5.Imu.accelerationAvailable() && M5.Imu.gyroscopeAvailable() && M5.Imu.magneticFieldAvailable()) {
             getImuData();
             if (magX < minMagX) minMagX = magX;
             if (magX > maxMagX) maxMagX = magX;
@@ -244,21 +244,21 @@ void calibrateMagnetometer()
             if (magZ < minMagZ) minMagZ = magZ;
             if (magZ > maxMagZ) maxMagZ = magZ;
         }
-        StickCP2.Display.print(".");
+        M5.Display.print(".");
         delay(100);
     }
-    StickCP2.Speaker.tone(8000, 20);
+    M5.Speaker.tone(8000, 20);
     delay(200);
-    StickCP2.Speaker.tone(8000, 20);
-    StickCP2.Display.clear();
-    StickCP2.Display.setCursor(40, 30);
-    StickCP2.Display.println("Calibrating magnetometer");
-    StickCP2.Display.setCursor(40, 50);
-    StickCP2.Display.printf("%6.2f  %6.2f  %6.2f      ", minMagX, minMagY, minMagZ);
-    StickCP2.Display.setCursor(40, 60);
-    StickCP2.Display.printf("%6.2f  %6.2f  %6.2f      ", maxMagX, maxMagY, maxMagZ);
+    M5.Speaker.tone(8000, 20);
+    M5.Display.clear();
+    M5.Display.setCursor(40, 30);
+    M5.Display.println("Calibrating magnetometer");
+    M5.Display.setCursor(40, 50);
+    M5.Display.printf("%6.2f  %6.2f  %6.2f      ", minMagX, minMagY, minMagZ);
+    M5.Display.setCursor(40, 60);
+    M5.Display.printf("%6.2f  %6.2f  %6.2f      ", maxMagX, maxMagY, maxMagZ);
     delay(2000);
-    StickCP2.Display.clear();
+    M5.Display.clear();
 }
 
 float normalizeMag(float value, float inMin, float inMax)
@@ -275,11 +275,15 @@ void IRAM_ATTR onTimer() {
 
 void setup() {
     auto cfg = M5.config();
-    StickCP2.begin(cfg);
 
-    StickCP2.Ex_I2C.begin();
+    //Activate external IMU
+    cfg.external_imu = true;
 
-    bmi270.init(I2C_NUM_0, BIM270_SENSOR_ADDR);
+    M5.begin(cfg);
+
+    M5.Imu.begin();
+
+    //M5.Imu.init(I2C_NUM_0, BIM270_SENSOR_ADDR);
 
     filter.begin(1000/interval); // Set filter update frequency (Hz)
 
@@ -288,26 +292,23 @@ void setup() {
     udp.begin(inPort);
 
     delay(1000);
-    StickCP2.Display.fillScreen(BLACK);
+    M5.Display.fillScreen(BLACK);
 
     // Display setup
-    StickCP2.Display.setRotation(3);
-    StickCP2.Display.fillScreen(BLACK);
-    StickCP2.Display.setTextSize(1);
+    M5.Display.setRotation(3);
+    M5.Display.fillScreen(BLACK);
+    M5.Display.setTextSize(1);
 
     // Use first (0) hardware timer on ESP32
     // Counts every microsecond 
     // true: count up 
-    timer = timerBegin(0 ,getApbFrequency() / 1000000 ,true );
+    timer = timerBegin(1000000 );
 
     // Set timer interrupt 
-    timerAttachInterrupt(timer, &onTimer, true );
+    timerAttachInterrupt(timer, &onTimer );
 
     // Set timer in microseconds 
-    timerAlarmWrite(timer, 1000 * interval, true );
-
-    // Start the timer
-    timerAlarmEnable(timer);
+    timerAlarm(timer, 1000 * interval, true, 0 );
 }
 
 //=============================================================
@@ -320,7 +321,7 @@ void loop()
         portEXIT_CRITICAL(&timerMux);
         
         // 1. GET IMU DATA
-        if (bmi270.accelerationAvailable() && bmi270.gyroscopeAvailable() && bmi270.magneticFieldAvailable()) {
+        if (M5.Imu.accelerationAvailable() && M5.Imu.gyroscopeAvailable() && M5.Imu.magneticFieldAvailable()) {
             getImuData();
 
             // Compensate accelerometer values with the average offset measured during calibration
@@ -344,47 +345,47 @@ void loop()
             filter.getQuaternion(&w, &x, &y, &z);
         }
 
-        StickCP2.update();
+        M5.update();
         // Trigger accelerometer calibration routine when button A is pressed
-        if (StickCP2.BtnA.wasPressed()) {
+        if (M5.BtnA.wasPressed()) {
             calibratePosition();
         }
 
         // Trigger magnetometer calibration routine when button B is pressed
-        if (StickCP2.BtnB.wasPressed()) {
+        if (M5.BtnB.wasPressed()) {
             calibrateMagnetometer();
         }
 
         // 2. PRINT DATA TO M5 LCD (optional)
-        StickCP2.Display.setCursor(80, 15);
-        StickCP2.Display.println("SEND GYRO PRO");
+        M5.Display.setCursor(80, 15);
+        M5.Display.println("SEND GYRO PRO");
 
-        StickCP2.Display.setCursor(30, 30);
-        StickCP2.Display.println("  X       Y       Z");
+        M5.Display.setCursor(30, 30);
+        M5.Display.println("  X       Y       Z");
 
         // Gyroscope data
-        StickCP2.Display.setCursor(30, 40);
-        StickCP2.Display.printf("%6.2f  %6.2f  %6.2f      ", gyroX, gyroY, gyroZ);
-        StickCP2.Display.setCursor(170, 40);
-        StickCP2.Display.print("o/s");
+        M5.Display.setCursor(30, 40);
+        M5.Display.printf("%6.2f  %6.2f  %6.2f      ", gyroX, gyroY, gyroZ);
+        M5.Display.setCursor(170, 40);
+        M5.Display.print("o/s");
 
         // Accelerometer data
-        StickCP2.Display.setCursor(30, 50);
-        StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", compAccX, compAccY, compAccZ);
-        StickCP2.Display.setCursor(170, 50);
-        StickCP2.Display.print("G");
+        M5.Display.setCursor(30, 50);
+        M5.Display.printf(" %5.2f   %5.2f   %5.2f   ", compAccX, compAccY, compAccZ);
+        M5.Display.setCursor(170, 50);
+        M5.Display.print("G");
 
         // Magnetometer data
-        StickCP2.Display.setCursor(30, 60);
-        StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", normMagX, normMagY, normMagZ);
-        StickCP2.Display.setCursor(170, 60);
-        StickCP2.Display.print("uT");
+        M5.Display.setCursor(30, 60);
+        M5.Display.printf(" %5.2f   %5.2f   %5.2f   ", normMagX, normMagY, normMagZ);
+        M5.Display.setCursor(170, 60);
+        M5.Display.print("uT");
 
         // Calculated AHRS
-        StickCP2.Display.setCursor(30, 80);
-        StickCP2.Display.println("  Pitch   Roll    Yaw");
-        StickCP2.Display.setCursor(30, 90);
-        StickCP2.Display.printf(" %5.2f   %5.2f   %5.2f   ", pitch, roll, yaw);
+        M5.Display.setCursor(30, 80);
+        M5.Display.println("  Pitch   Roll    Yaw");
+        M5.Display.setCursor(30, 90);
+        M5.Display.printf(" %5.2f   %5.2f   %5.2f   ", pitch, roll, yaw);
 
         // 3. SEND DATA VIA OSC
         // Gyroscope data
