@@ -278,6 +278,7 @@ void setup() {
 
     //Activate external IMU
     cfg.external_imu = true;
+    cfg.internal_imu = false;
 
     M5.begin(cfg);
 
